@@ -303,6 +303,7 @@ def confirm_payment_page(
         "shipping[address][postal_code]": address.postal_code,
         "shipping[address][state]": address.state,
         "shipping[name]": name,
+        "name_collection[individual_name]": name,
         "name_collection[source]": "payment_form",
         "custom_fields[0][custom_field_id]": "cstm_fld_UYaGKofBIQHCnY",
         "custom_fields[0][dropdown]": "b",

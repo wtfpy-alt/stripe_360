@@ -405,15 +405,16 @@ def step_0b_create_payment_session(user_agent: str) -> Dict[str, Any]:
             # Priority 1: line_item_group.due or .total (main amount to charge)
             if 'line_item_group' in session_data:
                 line_item_group = session_data['line_item_group']
-                amount = line_item_group.get('due') or line_item_group.get('total')
-                if amount:
-                    print(f"  ✓ Found amount in line_item_group: {amount} ({session_data.get('currency', 'unknown')})")
-                    session_data['_extracted_amount'] = str(amount)
+                if line_item_group is not None:
+                    amount = line_item_group.get('due') or line_item_group.get('total')
+                    if amount:
+                        print(f"  ✓ Found amount in line_item_group: {amount} ({session_data.get('currency', 'unknown')})")
+                        session_data['_extracted_amount'] = str(amount)
             
             # Priority 2: adaptive_pricing_info.local_currency_options[0].amount
             if not amount and 'adaptive_pricing_info' in session_data:
                 adaptive_pricing = session_data['adaptive_pricing_info']
-                if 'local_currency_options' in adaptive_pricing:
+                if adaptive_pricing is not None and 'local_currency_options' in adaptive_pricing:
                     options = adaptive_pricing['local_currency_options']
                     if options and len(options) > 0:
                         amount = options[0].get('amount')
@@ -423,10 +424,12 @@ def step_0b_create_payment_session(user_agent: str) -> Dict[str, Any]:
             
             # Priority 3: adaptive_pricing_info.integration_amount
             if not amount and 'adaptive_pricing_info' in session_data:
-                amount = session_data['adaptive_pricing_info'].get('integration_amount')
-                if amount:
-                    print(f"  ✓ Found integration_amount: {amount}")
-                    session_data['_extracted_amount'] = str(amount)
+                adaptive_pricing = session_data['adaptive_pricing_info']
+                if adaptive_pricing is not None:
+                    amount = adaptive_pricing.get('integration_amount')
+                    if amount:
+                        print(f"  ✓ Found integration_amount: {amount}")
+                        session_data['_extracted_amount'] = str(amount)
             
             if not amount:
                 print(f"  ⚠️  No amount found in session response")
@@ -443,7 +446,7 @@ def step_0b_create_payment_session(user_agent: str) -> Dict[str, Any]:
             # Try nested paths
             if not custom_fields:
                 for key in ['attributes', 'payment_settings', 'checkout', 'form', 'settings']:
-                    if key in session_data:
+                    if key in session_data and session_data[key] is not None:
                         custom_fields = session_data[key].get('custom_fields', [])
                         if custom_fields:
                             print(f"  Found custom_fields under session.{key}")
@@ -617,8 +620,11 @@ def step_2_confirm_payment_page(
     pk_live_key: str,
     session_id: str,
     custom_fields_list: list = None,
-    amount: str = "130313"
+    amount: str = "130313",
+    stripe_version: int = 1
 ) -> Dict[str, Any]:
+    
+        
 
     confirm_url = f"https://api.stripe.com/v1/payment_pages/{session_id}/confirm"
 
@@ -644,8 +650,13 @@ def step_2_confirm_payment_page(
         "shipping[address][state]": address['state'],
 
         "shipping[name]": random_values['full_name'],
+    }
 
-        "name_collection[individual_name]": random_values['first_name'],
+    # Add name_collection fields only for stripe versions < 4
+    if stripe_version < 4:
+        payload["name_collection[individual_name]"] = random_values['first_name']
+    
+    payload.update({
         "name_collection[source]": "payment_form",
 
         "expected_payment_method_type": "card",
@@ -674,7 +685,7 @@ def step_2_confirm_payment_page(
             "a5352a94-8cf1-45ed-844a-8c645d7b5ac0",
 
         "link_brand": "link",
-    }
+    })
 
     # ============================================================
     # DYNAMIC CUSTOM FIELDS
@@ -995,7 +1006,7 @@ def print_final_status(intent: Dict[str, Any]):
     print("\n" + "=" * 80)
 
 
-def process_payment_with_card(card_number: str, exp_month: int, exp_year: int, cvc: str) -> Dict[str, Any]:
+def process_payment_with_card(card_number: str, exp_month: int, exp_year: int, cvc: str, stripe_version: int = 1) -> Dict[str, Any]:
     """
     Process a payment using custom card data.
     
@@ -1113,7 +1124,7 @@ def process_payment_with_card(card_number: str, exp_month: int, exp_year: int, c
     payment_method_id = payment_method['id']
     
     # Step 2: Confirm payment page with dynamic custom fields and amount
-    payment_page = step_2_confirm_payment_page(payment_method_id, random_values, pk_live_key, session_id, custom_fields_list=custom_fields_list, amount=amount)
+    payment_page = step_2_confirm_payment_page(payment_method_id, random_values, pk_live_key, session_id, custom_fields_list=custom_fields_list, amount=amount, stripe_version=stripe_version)
     
     if not payment_page or 'payment_intent' not in payment_page:
         return {
@@ -1178,7 +1189,8 @@ def process_payment_with_card_v2(
     exp_year: int,
     cvc: str,
     payment_link_id: str = None,
-    payment_link_url: str = None
+    payment_link_url: str = None,
+    stripe_version: int = 1
 ) -> Dict[str, Any]:
     """
     Process a payment using custom card data with optional alternative payment link.
@@ -1207,8 +1219,8 @@ def process_payment_with_card_v2(
         if payment_link_url:
             PAYMENT_LINK_URL = payment_link_url
         
-        # Call the original function
-        return process_payment_with_card(card_number, exp_month, exp_year, cvc)
+        # Call the original function with stripe_version
+        return process_payment_with_card(card_number, exp_month, exp_year, cvc, stripe_version=stripe_version)
     
     finally:
         # Always restore original values

@@ -291,7 +291,7 @@ async def stripe_oauth(
         logger.error(f"Card validation error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Card validation error: {str(e)}")
 
-@app.get("/stripe_01")
+@app.get("/stripe_1")
 async def stripe(
     request: Request,
     auth: str = Query(...),
@@ -397,7 +397,7 @@ async def stripe(
         raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
 
 
-@app.get("/stripe2")
+@app.get("/stripe_2")
 async def stripe2(
     request: Request,
     auth: str = Query(...),
@@ -480,7 +480,8 @@ async def stripe2(
             exp_year,
             cvc,
             payment_link_id="28EaEX0ZR72t5CO2Icd3i1z",
-            payment_link_url="https://buy.stripe.com"
+            payment_link_url="https://buy.stripe.com",
+            stripe_version=2
         )
         
         logger.info(f"V2 payment result for {client_ip} - Status: {result.get('status')}")
@@ -591,7 +592,8 @@ async def stripe3(
             exp_year,
             cvc,
             payment_link_id="4gM4gz23VeuV0iu1E8d3i1k",
-            payment_link_url="https://buy.stripe.com"
+            payment_link_url="https://buy.stripe.com",
+            stripe_version=3
         )
         
         logger.info(f"V3 payment result for {client_ip} - Status: {result.get('status')}")
@@ -671,7 +673,8 @@ async def stripe4(
             exp_year,
             cvc,
             payment_link_id="5kQ9AT5VSbs87O75hY9sk0t",
-            payment_link_url="https://buy.stripe.com"
+            payment_link_url="https://buy.stripe.com",
+            stripe_version=4
         )
         logger.info(f"V4 payment result for {client_ip} - Status: {result.get('status')}")
         return {
@@ -748,7 +751,8 @@ async def stripe5(
             exp_year,
             cvc,
             payment_link_id="00geW51hebE87Kg000",
-            payment_link_url="https://buy.stripe.com"
+            payment_link_url="https://buy.stripe.com",
+            stripe_version=5
         )
         logger.info(f"V5 payment result for {client_ip} - Status: {result.get('status')}")
         return {
@@ -825,7 +829,8 @@ async def stripe6(
             exp_year,
             cvc,
             payment_link_id="28E00kfc07VY63X7n8gYV2A",
-            payment_link_url="https://buy.stripe.com"
+            payment_link_url="https://buy.stripe.com",
+            stripe_version=6
         )
         logger.info(f"V6 payment result for {client_ip} - Status: {result.get('status')}")
         return {
@@ -902,7 +907,8 @@ async def stripe7(
             exp_year,
             cvc,
             payment_link_id="00w00jfTJ81B46G7qQ6oo00",
-            payment_link_url="https://buy.stripe.com"
+            payment_link_url="https://buy.stripe.com",
+            stripe_version=7
         )
         logger.info(f"V7 payment result for {client_ip} - Status: {result.get('status')}")
         return {
@@ -979,7 +985,8 @@ async def stripe8(
             exp_year,
             cvc,
             payment_link_id="00wfZg1y9ftO33K1fBfjG05",
-            payment_link_url="https://buy.stripe.com"
+            payment_link_url="https://buy.stripe.com",
+            stripe_version=8
         )
         logger.info(f"V8 payment result for {client_ip} - Status: {result.get('status')}")
         return {
@@ -1056,7 +1063,8 @@ async def stripe9(
             exp_year,
             cvc,
             payment_link_id="bIY291eCob247niaEF",
-            payment_link_url="https://buy.stripe.com"
+            payment_link_url="https://buy.stripe.com",
+            stripe_version=9
         )
         logger.info(f"V9 payment result for {client_ip} - Status: {result.get('status')}")
         return {
