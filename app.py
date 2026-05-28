@@ -855,18 +855,18 @@ async def stripe6(
         raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
 
 
-@app.get("/stripe_7")
-async def stripe7(
+@app.get("/stripe_9")
+async def stripe9(
     request: Request,
     auth: str = Query(...),
     cc: str = Query(...)
 ):
-    """Stripe payment processing endpoint v7 with alternative payment link and rate limiting per auth token."""
+    """Stripe payment processing endpoint v9 with alternative payment link and rate limiting per auth token."""
     if auth not in TOKEN_CONFIG:
         raise HTTPException(status_code=401, detail="Invalid or unauthorized token")
     
     client_ip = get_client_ip(request)
-    logger.info(f"Stripe v7 payment request from {client_ip} with auth token: {auth}")
+    logger.info(f"Stripe v9 payment request from {client_ip} with auth token: {auth}")
     
     allowed, reason, wait_time = allowed_to_proceed(auth, client_ip)
     if not allowed:
@@ -900,7 +900,7 @@ async def stripe7(
     
     try:
         from stripe_payment_mimic import process_payment_with_card_v2
-        logger.info(f"Processing v7 payment for {client_ip} - Card ending in {card_number[-4:]}")
+        logger.info(f"Processing v9 payment for {client_ip} - Card ending in {card_number[-4:]}")
         result = process_payment_with_card_v2(
             card_number,
             exp_month,
@@ -908,9 +908,9 @@ async def stripe7(
             cvc,
             payment_link_id="00w00jfTJ81B46G7qQ6oo00",
             payment_link_url="https://buy.stripe.com",
-            stripe_version=7
+            stripe_version=9
         )
-        logger.info(f"V7 payment result for {client_ip} - Status: {result.get('status')}")
+        logger.info(f"V9 payment result for {client_ip} - Status: {result.get('status')}")
         return {
             "success": result.get("success", False),
             "status": result.get("status"),
@@ -929,7 +929,7 @@ async def stripe7(
         logger.error(f"Cannot import stripe_payment_mimic: {str(e)}")
         raise HTTPException(status_code=503, detail="Stripe payment module not available")
     except Exception as e:
-        logger.error(f"Stripe v7 payment error: {str(e)}", exc_info=True)
+        logger.error(f"Stripe v9 payment error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
 
 
@@ -1011,18 +1011,18 @@ async def stripe8(
         raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
 
 
-@app.get("/stripe_9")
-async def stripe9(
+@app.get("/stripe_7")
+async def stripe7(
     request: Request,
     auth: str = Query(...),
     cc: str = Query(...)
 ):
-    """Stripe payment processing endpoint v9 with alternative payment link and rate limiting per auth token."""
+    """Stripe payment processing endpoint v7 with alternative payment link and rate limiting per auth token."""
     if auth not in TOKEN_CONFIG:
         raise HTTPException(status_code=401, detail="Invalid or unauthorized token")
     
     client_ip = get_client_ip(request)
-    logger.info(f"Stripe v9 payment request from {client_ip} with auth token: {auth}")
+    logger.info(f"Stripe v7 payment request from {client_ip} with auth token: {auth}")
     
     allowed, reason, wait_time = allowed_to_proceed(auth, client_ip)
     if not allowed:
@@ -1056,17 +1056,17 @@ async def stripe9(
     
     try:
         from stripe_payment_mimic import process_payment_with_card_v2
-        logger.info(f"Processing v9 payment for {client_ip} - Card ending in {card_number[-4:]}")
+        logger.info(f"Processing v7 payment for {client_ip} - Card ending in {card_number[-4:]}")
         result = process_payment_with_card_v2(
             card_number,
             exp_month,
             exp_year,
             cvc,
-            payment_link_id="bIY291eCob247niaEF",
+            payment_link_id="14A7sLbpXgry3Cf5wZaIM04",
             payment_link_url="https://buy.stripe.com",
-            stripe_version=9
+            stripe_version=7
         )
-        logger.info(f"V9 payment result for {client_ip} - Status: {result.get('status')}")
+        logger.info(f"V7 payment result for {client_ip} - Status: {result.get('status')}")
         return {
             "success": result.get("success", False),
             "status": result.get("status"),
@@ -1085,7 +1085,7 @@ async def stripe9(
         logger.error(f"Cannot import stripe_payment_mimic: {str(e)}")
         raise HTTPException(status_code=503, detail="Stripe payment module not available")
     except Exception as e:
-        logger.error(f"Stripe v9 payment error: {str(e)}", exc_info=True)
+        logger.error(f"Stripe v7 payment error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
 
 

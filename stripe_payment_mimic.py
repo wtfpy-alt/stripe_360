@@ -288,32 +288,48 @@ def fetch_payment_page_amount(user_agent: str, session_id: str = None) -> Dict[s
         html = response.text
 
         # =========================================================
-        # MAIN STRIPE AMOUNT REGEX
+        # MULTIPLE STRIPE AMOUNT REGEX PATTERNS (with fallbacks)
         # =========================================================
 
-        pattern = r'CurrencyAmount[^>]*>\s*\$([\d,]+(?:\.\d+)?)\s*<'
+        patterns = [
+            # Pattern 1: CurrencyAmount span (original pattern)
+            r'CurrencyAmount[^>]*>\s*\$([\d,]+(?:\.\d+)?)\s*<',
+            # Pattern 2: data-amount or data-total attribute
+            r'(?:data-(?:amount|total)|data-price)=["\'](\d+)["\']',
+            # Pattern 3: price or amount in common div/span patterns
+            r'(?:price|amount|total)[^>]*>\s*\$?([\d,]+(?:\.\d+)?)',
+            # Pattern 4: JSON data with price/amount
+            r'["\'](?:amount|price|total)["\'][\s:]*(\d+)',
+            # Pattern 5: Scientific or regular notation prices in HTML
+            r'\$\s*([\d,]+(?:\.\d+)?)',
+        ]
 
-        match = re.search(pattern, html, re.IGNORECASE)
-
-        if match:
-
-            amount_text = match.group(1)
-
-            amount_float = float(
-                amount_text.replace(",", "")
-            )
-
-            amount_cents = int(amount_float * 100)
-
-            print(f"\n✓ Amount Found")
-            print(f"Displayed: ${amount_float:.2f}")
-            print(f"Cents: {amount_cents}")
-
-            return {
-                "amount": str(amount_cents),
-                "currency": "usd",
-                "formatted": f"${amount_float:.2f}"
-            }
+        for idx, pattern in enumerate(patterns):
+            match = re.search(pattern, html, re.IGNORECASE)
+            
+            if match:
+                try:
+                    amount_text = match.group(1)
+                    
+                    # If it looks like cents (5 digits, no decimal), use as-is
+                    if amount_text.isdigit() and len(amount_text) >= 3 and '.' not in amount_text:
+                        amount_cents = int(amount_text)
+                    else:
+                        # Otherwise convert from dollars
+                        amount_float = float(amount_text.replace(",", ""))
+                        amount_cents = int(amount_float * 100)
+                    
+                    print(f"\n✓ Amount Found (pattern {idx+1})")
+                    print(f"Displayed: ${amount_cents/100:.2f}")
+                    print(f"Cents: {amount_cents}")
+                    
+                    return {
+                        "amount": str(amount_cents),
+                        "currency": "usd",
+                        "formatted": f"${amount_cents/100:.2f}"
+                    }
+                except (ValueError, AttributeError):
+                    continue
 
         print("\n⚠️ Amount span not found")
 
@@ -653,8 +669,9 @@ def step_2_confirm_payment_page(
     }
 
     # Add name_collection fields only for stripe versions < 4
-    if stripe_version < 4:
+    if stripe_version < 4 or stripe_version >=8:
         payload["name_collection[individual_name]"] = random_values['first_name']
+    
     
     payload.update({
         "name_collection[source]": "payment_form",
@@ -1167,6 +1184,9 @@ def process_payment_with_card(card_number: str, exp_month: int, exp_year: int, c
     
     our_status = status_map.get(stripe_status, 'failed')
     
+    # Convert amount from cents to dollars
+    amount_dollars = float(amount) / 100 if amount else 1.0
+    
     return {
         "success": True,
         "status": our_status,
@@ -1175,7 +1195,7 @@ def process_payment_with_card(card_number: str, exp_month: int, exp_year: int, c
         "payment_method_id": payment_method_id,
         "card_type": random_values['card_type'],
         "card_last4": card_number[-4:],
-        "amount": 1.0,  # Hardcoded to $1 (100 cents)
+        "amount": amount_dollars,
         "currency": final_intent.get('currency', 'usd').upper(),
         "error_code": error_obj.get('code') if error_obj else None,
         "error_message": error_obj.get('message') if error_obj else None,

@@ -1,22 +1,19 @@
 # database.py
-import os
 import datetime
-import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# MongoDB Connection
-MONGO_URL = os.getenv("MONGO_URL", "mongodb+srv://wtfpy:WTF%40H4rsh@strongdb.lxirct8.mongodb.net/?appName=strongdb")
+# MongoDB URI
+uri = "mongodb://mongo:uFgHhfbHAYBzcvxPUFyoANEMaFjouCev@tramway.proxy.rlwy.net:38236/razor_x_bot?authSource=admin"
 
+# Async Mongo Client
 client = AsyncIOMotorClient(
-    MONGO_URL,
-    tls=True,
-    tlsCAFile=certifi.where(),
-    retryWrites=True,
-    serverSelectionTimeoutMS=30000,
-    connectTimeoutMS=30000,
-    socketTimeoutMS=30000
+    uri,
+    tls=False,
+    directConnection=True,
+    serverSelectionTimeoutMS=30000
 )
 
+# Database
 db = client["razor_x_bot"]
 
 # Collections
