@@ -109,6 +109,8 @@ def get_random_values(card_number: str = None, exp_month: int = None, exp_year: 
         card_type, card_number = random.choice(list(CARD_NUMBERS.items()))
     
     user_agent = random.choice(USER_AGENTS)
+    # Generate random phone number (US format)
+    phone_number = f"+1{random.randint(2, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(2, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(1, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}"
     
     return {
         "first_name": first_name,
@@ -121,6 +123,7 @@ def get_random_values(card_number: str = None, exp_month: int = None, exp_year: 
         "exp_month": exp_month or 6,
         "exp_year": exp_year or 28,
         "cvc": cvc or "000",
+        "phone_number": phone_number,
         "user_agent": user_agent,
     }
 
@@ -667,9 +670,13 @@ def step_2_confirm_payment_page(
 
         "shipping[name]": random_values['full_name'],
     }
+    
+    # Add phone number for versions that require it (8 and others)
+    if stripe_version in (8,):
+        payload["billing_details[phone]"] = random_values.get('phone_number', '+14155552671')
 
-    # Add name_collection fields only for stripe versions < 4
-    if stripe_version < 4 or stripe_version >=8:
+    # Add name_collection fields only for stripe versions other than 4, 7, and 9
+    if stripe_version not in (4, 6, 7):
         payload["name_collection[individual_name]"] = random_values['first_name']
     
     
@@ -1246,6 +1253,170 @@ def process_payment_with_card_v2(
         # Always restore original values
         PAYMENT_LINK_ID = original_link_id
         PAYMENT_LINK_URL = original_link_url
+
+
+def process_payment_with_card_stripe8(
+    card_number: str,
+    exp_month: int,
+    exp_year: int,
+    cvc: str,
+    payment_link_id: str = None,
+    payment_link_url: str = None
+) -> Dict[str, Any]:
+    """
+    Process a payment for Stripe version 8 with minimal billing details and valid US phone number.
+    Stripe v8 doesn't send full billing details but includes phone in the payment confirmation.
+    
+    Args:
+        card_number: 13-16 digit card number
+        exp_month: Expiry month (1-12)
+        exp_year: Expiry year (2-digit or 4-digit)
+        cvc: 3-4 digit security code
+        payment_link_id: Optional alternative payment link ID
+        payment_link_url: Optional alternative payment link URL
+    
+    Returns:
+        dict: Payment result with status and details
+    """
+    global PAYMENT_LINK_ID, PAYMENT_LINK_URL
+    
+    original_link_id = PAYMENT_LINK_ID
+    original_link_url = PAYMENT_LINK_URL
+    
+    try:
+        # Use provided payment link or defaults
+        if payment_link_id:
+            PAYMENT_LINK_ID = payment_link_id
+        if payment_link_url:
+            PAYMENT_LINK_URL = payment_link_url
+        
+        # Generate random values with phone number
+        random_values = get_random_values(card_number, exp_month, exp_year, cvc)
+        pk_live_key = random_values.get('pk_live')
+        
+        # Step 0b: Create payment session
+        session_data = step_0b_create_payment_session(random_values['user_agent'])
+        if not session_data:
+            return {"success": False, "error": "Failed to create payment session"}
+        
+        session_id = session_data.get('session_id')
+        amount = session_data.get('_extracted_amount', '130313')
+        custom_fields = session_data.get('_extracted_custom_fields', [])
+        
+        # Fetch the pk_live key
+        pk_live_key = session_data.get('pk_live') or 'pk_test_default'
+        
+        # Step 1: Create payment method (minimal billing details for stripe_8)
+        payment_method = step_1_create_payment_method_minimal(random_values, pk_live_key)
+        if not payment_method or 'id' not in payment_method:
+            return {"success": False, "error": "Failed to create payment method"}
+        
+        payment_method_id = payment_method['id']
+        
+        # Step 2: Confirm payment page with phone in the payload
+        payment_page = step_2_confirm_payment_page(
+            payment_method_id,
+            random_values,
+            pk_live_key,
+            session_id,
+            custom_fields,
+            amount,
+            stripe_version=8
+        )
+        
+        if not payment_page or 'payment_intent' not in payment_page:
+            return {"success": False, "error": "Failed to confirm payment page"}
+        
+        payment_intent_data = payment_page['payment_intent']
+        intent_id = payment_intent_data.get('id')
+        client_secret = payment_intent_data.get('client_secret')
+        
+        # Step 3: Check final payment status
+        final_intent = step_3_check_payment_intent(intent_id, client_secret, random_values['user_agent'], pk_live_key)
+        
+        if final_intent:
+            status = final_intent.get('status', 'unknown')
+            return {
+                "success": True,
+                "status": status,
+                "payment_id": intent_id,
+                "payment_method_id": payment_method_id,
+                "card_type": random_values['card_type'],
+                "card_last4": random_values['card_number'][-4:],
+                "amount": amount,
+                "currency": "usd",
+                "stripe_status": status,
+                "phone": random_values['phone_number']
+            }
+        else:
+            return {"success": False, "error": "Failed to retrieve payment intent"}
+    
+    finally:
+        # Always restore original values
+        PAYMENT_LINK_ID = original_link_id
+        PAYMENT_LINK_URL = original_link_url
+
+
+def step_1_create_payment_method_minimal(random_values: Dict[str, Any], pk_live_key: str) -> Dict[str, Any]:
+    """
+    Step 1 variant: Create payment method with minimal billing details (for Stripe v8).
+    
+    Args:
+        random_values: Dictionary with randomized customer data
+        pk_live_key: The dynamic public key from payment link
+    
+    Returns:
+        dict: The payment method object with ID
+    """
+    payment_method_url = "https://api.stripe.com/v1/payment_methods"
+    
+    # Minimal payload without full billing details
+    address = random_values['address']
+    payload = {
+        "type": "card",
+        "card[number]": random_values['card_number'],
+        "card[cvc]": str(random_values.get('cvc', '000')),
+        "card[exp_month]": str(random_values.get('exp_month', 6)).zfill(2),
+        "card[exp_year]": str(random_values.get('exp_year', 28)).zfill(2),
+        "billing_details[name]": random_values['full_name'],
+        "billing_details[email]": random_values['email'],
+        # Minimal address - only country and postal_code
+        "billing_details[address][country]": "US",
+        "billing_details[address][postal_code]": address['postal_code'],
+        "key": pk_live_key,
+    }
+    
+    headers = build_headers(random_values['user_agent'])
+    
+    print("\n" + "=" * 80)
+    print("STEP 1: CREATE PAYMENT METHOD (Minimal Details for Stripe v8)")
+    print("=" * 80)
+    print(f"Endpoint: POST /v1/payment_methods")
+    print(f"Card: {random_values['card_type'].title()} ****{random_values['card_number'][-4:]}")
+    print(f"Name: {random_values['full_name']}")
+    print(f"Phone: {random_values['phone_number']}")
+    
+    try:
+        response = requests.post(
+            payment_method_url,
+            data=payload,
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            payment_method = response.json()
+            pm_id = payment_method.get('id')
+            print(f"\n✓ Payment Method Created: {pm_id}")
+            return payment_method
+        else:
+            print(f"\n✗ Failed: {response.status_code}")
+            print(response.text[:300])
+            return {}
+    
+    except requests.exceptions.RequestException as e:
+        print(f"\n✗ Error: {str(e)}")
+        return {}
 
 
 def expected_response_example() -> Dict[str, Any]:

@@ -11,6 +11,90 @@ from playwright_automation import run_checkout
 
 app = FastAPI()
 
+# ============================================================================
+# STRIPE VERSIONS CONFIGURATION
+# ============================================================================
+# Add new Stripe payment links here - automatically generates /stripe_{num} endpoints
+# Format: version_number: {
+#     "payment_link_id": "...",
+#     "payment_link_url": "https://buy.stripe.com",
+#     "stripe_version": version_number,
+#     "use_minimal_billing": False,  # Set to True for versions that need minimal billing details
+#     "description": "..."
+# }
+STRIPE_VERSIONS = {
+    1: {
+        "payment_link_id": "28E5kDbEv0E59T4beId3i1r",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 1,
+        "use_minimal_billing": False,
+        "description": "Standard Stripe v1 payment link"
+    },
+    2: {
+        "payment_link_id": "28EaEX0ZR72t5CO2Icd3i1z",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 2,
+        "use_minimal_billing": False,
+        "description": "Standard Stripe v2 payment link"
+    },
+    3: {
+        "payment_link_id": "4gM4gz23VeuV0iu1E8d3i1k",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 3,
+        "use_minimal_billing": False,
+        "description": "Standard Stripe v3 payment link"
+    },
+    4: {
+        "payment_link_id": "5kQ9AT5VSbs87O75hY9sk0t",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 4,
+        "use_minimal_billing": False,
+        "description": "Standard Stripe v4 payment link (no name_collection[individual_name])"
+    },
+    5: {
+        "payment_link_id": "00geW51hebE87Kg000",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 5,
+        "use_minimal_billing": False,
+        "description": "Standard Stripe v5 payment link"
+    },
+    6: {
+        "payment_link_id": "28E00kfc07VY63X7n8gYV2A",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 6,
+        "use_minimal_billing": False,
+        "description": "Standard Stripe v6 payment link (no name_collection[individual_name])"
+    },
+    7: {
+        "payment_link_id": "14A7sLbpXgry3Cf5wZaIM04",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 7,
+        "use_minimal_billing": False,
+        "description": "Standard Stripe v7 payment link (no name_collection[individual_name])"
+    },
+    8: {
+        "payment_link_id": "6oU14o6pY8yfbG57yIa7C0x",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 8,
+        "use_minimal_billing": True,
+        "description": "Stripe v8 payment link (minimal billing details with phone)"
+    },
+    9: {
+        "payment_link_id": "00w00jfTJ81B46G7qQ6oo00",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 9,
+        "use_minimal_billing": False,
+        "description": "Standard Stripe v9 payment link (no name_collection[individual_name])"
+    },
+    10: {
+        "payment_link_id": "dRm8wObuC8pH5m6fFB77O07",
+        "payment_link_url": "https://buy.stripe.com",
+        "stripe_version": 10,
+        "use_minimal_billing": True,
+        "description": "v10"
+    }
+}
+
 # Token-based rate limiting configuration
 # Each token can have different rate limit settings
 TOKEN_CONFIG = {
@@ -105,44 +189,6 @@ def allowed_to_proceed(token: str, client_ip: str) -> tuple:
 
 
 _BOT_PROCESS = None
-
-@app.on_event("startup")
-async def startup_event():
-    global _BOT_PROCESS
-
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-    bot_path = os.path.join(
-        BASE_DIR,
-        "RAZOR X BOT",
-        "Leak-main",
-        "bot.py"
-    )
-
-    bot_2_path = os.path.join(
-        BASE_DIR,
-        "rzapi_fastapi.py"
-    )
-
-    bot_cwd = os.path.dirname(bot_path)
-
-    print(f"Bot path: {bot_path}")
-
-    if not os.path.exists(bot_path):
-        print("❌ bot.py not found!")
-        return
-
-    if _BOT_PROCESS is None or _BOT_PROCESS.poll() is not None:
-
-        _BOT_PROCESS = subprocess.Popen(
-            [
-                sys.executable,
-                bot_path
-            ],
-            cwd=bot_cwd
-        )
-
-        print("✅ Bot started successfully!")
 
 
 @app.get("/razorpay")
@@ -977,16 +1023,15 @@ async def stripe8(
         raise HTTPException(status_code=400, detail=f"Invalid card data format: {str(e)}")
     
     try:
-        from stripe_payment_mimic import process_payment_with_card_v2
+        from stripe_payment_mimic import process_payment_with_card_stripe8
         logger.info(f"Processing v8 payment for {client_ip} - Card ending in {card_number[-4:]}")
-        result = process_payment_with_card_v2(
+        result = process_payment_with_card_stripe8(
             card_number,
             exp_month,
             exp_year,
             cvc,
-            payment_link_id="00wfZg1y9ftO33K1fBfjG05",
-            payment_link_url="https://buy.stripe.com",
-            stripe_version=8
+            payment_link_id=STRIPE_VERSIONS[8]["payment_link_id"],
+            payment_link_url=STRIPE_VERSIONS[8]["payment_link_url"]
         )
         logger.info(f"V8 payment result for {client_ip} - Status: {result.get('status')}")
         return {
@@ -1089,12 +1134,128 @@ async def stripe7(
         raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
 
 
+# ============================================================================
+# HOW TO ADD NEW STRIPE VERSIONS:
+# ============================================================================
+# 1. Add entry to STRIPE_VERSIONS dict at the top of this file:
+#    <version_number>: {
+#        "payment_link_id": "your_payment_link_id",
+#        "payment_link_url": "https://buy.stripe.com",
+#        "stripe_version": <version_number>,
+#        "use_minimal_billing": False,  # True for versions needing minimal billing
+#        "description": "Description of this version"
+#    }
+#
+# 2. Add corresponding payment processing function to stripe_payment_mimic.py if needed:
+#    - For standard versions: use process_payment_with_card_v2()
+#    - For minimal billing versions (like v8): create custom function
+#
+# 3. Create new endpoint function like:
+#    @app.get("/stripe_{version}")
+#    async def stripe_{version}(...):
+#        # Use STRIPE_VERSIONS[{version}] to get config
+#        # Import appropriate function from stripe_payment_mimic
+#        # Call with payment_link_id from config
+#
+# Example: To add version 10 with custom link:
+# - Update STRIPE_VERSIONS dict
+# - Create @app.get("/stripe_10") endpoint
+# - Test with: GET /stripe_10?auth=WTFH4RSH&cc=4242424242424248|06|28|123
+
+def get_stripe_endpoint_template(version: int) -> str:
+    """
+    Generate FastAPI endpoint code template for a new Stripe version.
+    Use this to quickly create new endpoints.
+    """
+    config = STRIPE_VERSIONS.get(version, {})
+    payment_link_id = config.get("payment_link_id", f"link_id_{version}")
+    
+    template = f'''
+@app.get("/stripe_{version}")
+async def stripe{version}(
+    request: Request,
+    auth: str = Query(...),
+    cc: str = Query(...)
+):
+    """Stripe payment processing endpoint v{version}."""
+    if auth not in TOKEN_CONFIG:
+        raise HTTPException(status_code=401, detail="Invalid or unauthorized token")
+    
+    client_ip = get_client_ip(request)
+    logger.info(f"Stripe v{version} payment request from {{client_ip}} with auth token: {{auth}}")
+    
+    allowed, reason, wait_time = allowed_to_proceed(auth, client_ip)
+    if not allowed:
+        logger.warning(f"Rate limit denied for {{auth}}:{{client_ip}} - {{reason}}")
+        raise HTTPException(status_code=429, detail=reason)
+    
+    try:
+        parts = cc.split("|")
+        if len(parts) != 4:
+            raise HTTPException(status_code=400, detail="Invalid card format. Use: number|mm|yy|cvv")
+        
+        card_number = parts[0].strip()
+        exp_month = int(parts[1].strip())
+        exp_year = int(parts[2].strip())
+        cvc = parts[3].strip()
+        
+        if exp_year > 99:
+            exp_year = exp_year % 100
+        if not card_number.isdigit() or len(card_number) not in [13, 14, 15, 16]:
+            raise HTTPException(status_code=400, detail="Card number must be 13-16 digits")
+        if not (1 <= exp_month <= 12):
+            raise HTTPException(status_code=400, detail="Expiry month must be 01-12")
+        if not (0 <= exp_year <= 99):
+            raise HTTPException(status_code=400, detail="Expiry year must be 2-digit (00-99) or 4-digit (2000-2099)")
+        if not cvc.isdigit() or len(cvc) not in [3, 4]:
+            raise HTTPException(status_code=400, detail="CVC must be 3-4 digits")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid card data format: {{str(e)}}")
+    
+    try:
+        from stripe_payment_mimic import process_payment_with_card_v2
+        logger.info(f"Processing v{version} payment for {{client_ip}} - Card ending in {{card_number[-4:]}}")
+        result = process_payment_with_card_v2(
+            card_number,
+            exp_month,
+            exp_year,
+            cvc,
+            payment_link_id=STRIPE_VERSIONS[{version}]["payment_link_id"],
+            payment_link_url=STRIPE_VERSIONS[{version}]["payment_link_url"],
+            stripe_version={version}
+        )
+        logger.info(f"V{version} payment result for {{client_ip}} - Status: {{result.get('status')}}")
+        return {{
+            "success": result.get("success", False),
+            "status": result.get("status"),
+            "payment_id": result.get("payment_id"),
+            "payment_method_id": result.get("payment_method_id"),
+            "card_type": result.get("card_type"),
+            "card_last4": result.get("card_last4"),
+            "amount": result.get("amount"),
+            "currency": result.get("currency"),
+            "stripe_status": result.get("stripe_status"),
+            "error_code": result.get("error_code"),
+            "error_message": result.get("error_message"),
+            "error": result.get("error")
+        }}
+    except ImportError as e:
+        logger.error(f"Cannot import stripe_payment_mimic: {{str(e)}}")
+        raise HTTPException(status_code=503, detail="Stripe payment module not available")
+    except Exception as e:
+        logger.error(f"Stripe v{version} payment error: {{str(e)}}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Payment processing error: {{str(e)}}")
+'''
+    return template
+
+
 @app.get("/")
 async def root():
     return {"status": "running"}
 
 
 @app.get("/stats")
+
 async def get_stats():
     """Get rate limiting statistics per token"""
     stats = {
